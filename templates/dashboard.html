@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - WVMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4">Wood Vehicle Management System</h1>
+            <p class="lead text-muted">Welcome to your vehicle management dashboard</p>
+            <hr>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3 h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-truck"></i> Total Vehicles</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title display-3">{{ total_vehicles }}</h2>
+                    <p class="card-text">Total vehicles registered in the system</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3 h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Pending Measurements</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title display-3">{{ vehicles_left }}</h2>
+                    <p class="card-text">Vehicles waiting to be measured</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3 h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-check-circle"></i> Measured Vehicles</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="card-title display-3">{{ total_vehicles - vehicles_left }}</h2>
+                    <p class="card-text">Vehicles with completed measurements</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('vehicles') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-plus-circle"></i> Add New Vehicle
+                        </a>
+                        <a href="{{ url_for('vehicles') }}" class="btn btn-success btn-lg">
+                            <i class="bi bi-table"></i> View All Vehicles
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">System Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Measurement Completion Rate</h6>
+                                <small>{{ "%.1f"|format((total_vehicles - vehicles_left) / total_vehicles * 100 if total_vehicles > 0 else 0) }}%</small>
+                            </div>
+                            <div class="progress mt-2">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ (total_vehicles - vehicles_left) / total_vehicles * 100 if total_vehicles > 0 else 0 }}%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Grade Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Grade Type</th>
+                                    <th>Total Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for grade_type, amount in grade_data.items() %}
+                                <tr>
+                                    <td><strong>{{ grade_type }}</strong></td>
+                                    <td>{{ "%.2f"|format(amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-trophy"></i> Top Parties by Total Grade</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Party Name</th>
+                                    <th>Total Grade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for party in party_data %}
+                                <tr>
+                                    <td><strong>{{ party.name }}</strong></td>
+                                    <td>{{ "%.2f"|format(party.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not party_data %}
+                                <tr>
+                                    <td colspan="2" class="text-center">No data available</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

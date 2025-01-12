@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Add Measurement{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>Add Measurement for Vehicle {{ vehicle.vehicle_no }}</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="grade_a" class="form-label">Grade A</label>
+                                <input type="number" step="0.01" class="form-control" id="grade_a" name="grade_a" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="grade_b" class="form-label">Grade B</label>
+                                <input type="number" step="0.01" class="form-control" id="grade_b" name="grade_b" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="grade_c" class="form-label">Grade C</label>
+                                <input type="number" step="0.01" class="form-control" id="grade_c" name="grade_c" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="grade_d" class="form-label">Grade D</label>
+                                <input type="number" step="0.01" class="form-control" id="grade_d" name="grade_d" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="total_grade" class="form-label">Total Grade</label>
+                                <input type="number" step="0.01" class="form-control" id="total_grade" name="total_grade" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="pcs" class="form-label">PCS</label>
+                                <input type="number" class="form-control" id="pcs" name="pcs" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="mix_total" class="form-label">Mix Total</label>
+                                <input type="number" step="0.01" class="form-control" id="mix_total" name="mix_total" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="six_futta" class="form-label">6 Futta</label>
+                                <input type="number" step="0.01" class="form-control" id="six_futta" name="six_futta" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="pcs_count" class="form-label">PCS Count</label>
+                                <input type="number" class="form-control" id="pcs_count" name="pcs_count" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="remarks" class="form-label">Remarks</label>
+                                <textarea class="form-control" id="remarks" name="remarks" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Save Measurement</button>
+                        <a href="{{ url_for('vehicles') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    // Auto-calculate total grade
+    document.addEventListener('DOMContentLoaded', function() {
+        const gradeInputs = ['grade_a', 'grade_b', 'grade_c', 'grade_d'];
+        const totalGradeInput = document.getElementById('total_grade');
+
+        gradeInputs.forEach(gradeId => {
+            document.getElementById(gradeId).addEventListener('input', calculateTotal);
+        });
+
+        function calculateTotal() {
+            let total = 0;
+            gradeInputs.forEach(gradeId => {
+                const value = parseFloat(document.getElementById(gradeId).value) || 0;
+                total += value;
+            });
+            totalGradeInput.value = total.toFixed(2);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}
