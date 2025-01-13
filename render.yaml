@@ -2,13 +2,10 @@ services:
   - type: web
     name: wvms
     env: python
-    region: singapore  # Choose the region closest to your users
-    buildCommand: |
-      pip install numpy==1.24.3
-      pip install -r requirements.txt
-    startCommand: |
-      python init_db.py
-      gunicorn app:app --bind 0.0.0.0:$PORT
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --threads 8 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
@@ -20,14 +17,22 @@ services:
         value: app.py
       - key: PORT
         value: 10000
-      - key: PYTHONPATH
-        value: /opt/render/project/src
-    autoDeploy: true
+      - key: WEB_CONCURRENCY
+        value: 4
     healthCheckPath: /login
-    plan: free
+    autoDeploy: true
+    domains:
+      - wvms.onrender.com
+    disk:
+      name: wvms-data
+      mountPath: /data
+      sizeGB: 1
 
 databases:
-  - name: wvms_db
+  - name: wvms-db
     plan: free
+    type: postgres
+    region: singapore
     databaseName: wvms
+    user: wvms_admin
     ipAllowList: []
