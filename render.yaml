@@ -19,6 +19,8 @@ services:
         value: app.py
       - key: PYTHONUNBUFFERED
         value: "true"
+      - key: ADMIN_PASSWORD
+        value: your_secure_admin_password  # IMPORTANT: Replace with a strong password
     envVarsFromDatabase:
       - key: DATABASE_URL
         fromDatabase:

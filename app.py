@@ -25,37 +25,42 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for
 
 # Database Configuration
 def configure_database(app):
-    # Determine database URL
-    if os.environ.get('FLASK_ENV') == 'production':
-        database_url = os.environ.get('DATABASE_URL')
+    try:
+        # Determine database URL
+        if os.environ.get('FLASK_ENV') == 'production':
+            database_url = os.environ.get('DATABASE_URL')
+            
+            if not database_url:
+                app.logger.error("DATABASE_URL not found. Cannot connect to database.")
+                raise ValueError("DATABASE_URL environment variable is required in production")
+            
+            # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            
+            # Additional connection options for production
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                'pool_size': 10,
+                'max_overflow': 20,
+                'pool_timeout': 30,
+                'pool_recycle': 3600,
+            }
+        else:
+            # Development environment fallback
+            database_url = 'sqlite:///development.db'
         
-        if not database_url:
-            logger.error("DATABASE_URL not found. Cannot connect to database.")
-            raise ValueError("DATABASE_URL environment variable is required in production")
+        # Configure SQLAlchemy
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         
-        # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        
-        # Additional connection options for production
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_size': 10,
-            'max_overflow': 20,
-            'pool_timeout': 30,
-            'pool_recycle': 3600,
-        }
-    else:
-        # Development environment fallback
-        database_url = 'sqlite:///development.db'
+        app.logger.info(f"Database configured with URL: {database_url}")
+        return database_url
     
-    # Configure SQLAlchemy
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    logger.info(f"Database configured with URL: {database_url}")
-    return database_url
+    except Exception as e:
+        app.logger.error(f"Database configuration error: {str(e)}")
+        raise
 
-# Configure database before initializing
+# Initialize database before initializing
 try:
     database_url = configure_database(app)
     
@@ -200,17 +205,39 @@ def dashboard():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Add comprehensive logging for login attempts
+    app.logger.info(f"Login attempt from IP: {request.remote_addr}")
+    
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
         
-        user = User.query.filter_by(username=username).first()
+        app.logger.info(f"Login attempt for username: {username}")
         
-        if user and user.check_password(password):
+        try:
+            # More robust user query
+            user = User.query.filter(User.username == username).first()
+            
+            if user is None:
+                app.logger.warning(f"Login failed: User {username} not found")
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Verify password
+            if not user.check_password(password):
+                app.logger.warning(f"Login failed: Incorrect password for user {username}")
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Successful login
             login_user(user)
+            app.logger.info(f"Successful login for user: {username}")
             return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password')
+        
+        except Exception as e:
+            # Catch and log any unexpected errors
+            app.logger.error(f"Login error: {str(e)}")
+            flash('An unexpected error occurred. Please try again.', 'error')
     
     return render_template('login.html')
 
