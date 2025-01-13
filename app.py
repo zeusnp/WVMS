@@ -5,116 +5,206 @@ from datetime import datetime
 import os
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 from functools import wraps
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_migrate import Migrate
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Load environment variables
+load_dotenv()
+
+# Configure comprehensive logging
+def setup_logging(app):
+    # Remove default handlers
+    del app.logger.handlers[:]
+    
+    # Console Handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    console_handler.setFormatter(console_formatter)
+    app.logger.addHandler(console_handler)
+    
+    # File Handler
+    log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        os.path.join(log_dir, 'app.log'), 
+        maxBytes=10240, 
+        backupCount=10
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s'
+    )
+    file_handler.setFormatter(file_formatter)
+    app.logger.addHandler(file_handler)
+    
+    # Set overall logging level
+    app.logger.setLevel(logging.DEBUG)
+    
+    return app
 
 # Initialize Flask app
 app = Flask(__name__)
-
-# Load environment variables
-load_dotenv()
+app = setup_logging(app)
 
 # Secret Key Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
 
-# Database Configuration
+# Comprehensive Database Configuration
 def configure_database(app):
     try:
         # Determine database URL
-        if os.environ.get('FLASK_ENV') == 'production':
-            database_url = os.environ.get('DATABASE_URL')
-            
-            if not database_url:
-                app.logger.error("DATABASE_URL not found. Cannot connect to database.")
-                raise ValueError("DATABASE_URL environment variable is required in production")
-            
-            # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
-            if database_url.startswith('postgres://'):
-                database_url = database_url.replace('postgres://', 'postgresql://', 1)
-            
-            # Additional connection options for production
-            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-                'pool_size': 10,
-                'max_overflow': 20,
-                'pool_timeout': 30,
-                'pool_recycle': 3600,
-            }
-        else:
-            # Development environment fallback
-            database_url = 'sqlite:///development.db'
+        database_url = os.environ.get('DATABASE_URL')
+        
+        if not database_url:
+            app.logger.critical("DATABASE_URL not found. Cannot connect to database.")
+            raise ValueError("DATABASE_URL environment variable is REQUIRED")
+        
+        # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
         # Configure SQLAlchemy
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         
+        # Connection pooling and timeout settings
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 10,
+            'max_overflow': 20,
+            'pool_timeout': 30,
+            'pool_recycle': 3600,
+        }
+        
         app.logger.info(f"Database configured with URL: {database_url}")
         return database_url
     
     except Exception as e:
-        app.logger.error(f"Database configuration error: {str(e)}")
+        app.logger.critical(f"FATAL DATABASE CONFIG ERROR: {str(e)}")
         raise
 
-# Initialize database before initializing
-try:
-    database_url = configure_database(app)
-    
-    # Initialize SQLAlchemy
-    db = SQLAlchemy(app)
-    
-    # Initialize Flask-Migrate
-    migrate = Migrate(app, db)
-    
-    # Create tables if not exists (safe for production)
-    with app.app_context():
-        db.create_all()
-    
-    logger.info("Database initialization successful")
+# Initialize SQLAlchemy and Migrate
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
-except Exception as e:
-    logger.error(f"Database initialization failed: {e}")
-    raise
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# Import pandas after app initialization
-try:
-    import pandas as pd
-    print("Successfully imported pandas")
-except ImportError as e:
-    print(f"Warning: Failed to import pandas: {str(e)}")
-    pd = None
-
-# Admin required decorator
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            flash('You need administrator privileges to access this page.', 'error')
-            return redirect(url_for('dashboard'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# User Model
+# User Model with Enhanced Logging
 class User(UserMixin, db.Model):
-    __tablename__ = 'users'  # Change table name to avoid reserved keyword
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        try:
+            self.password_hash = generate_password_hash(password)
+            app.logger.info(f"Password set for user: {self.username}")
+        except Exception as e:
+            app.logger.error(f"Password set failed for user {self.username}: {str(e)}")
+            raise
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        try:
+            is_valid = check_password_hash(self.password_hash, password)
+            if not is_valid:
+                app.logger.warning(f"Invalid password attempt for user: {self.username}")
+            return is_valid
+        except Exception as e:
+            app.logger.error(f"Password check failed for user {self.username}: {str(e)}")
+            return False
+
+# Login Manager Configuration
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        return User.query.get(int(user_id))
+    except Exception as e:
+        app.logger.error(f"User load error for ID {user_id}: {str(e)}")
+        return None
+
+# Login Route with Comprehensive Error Handling
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    app.logger.info(f"Login attempt from IP: {request.remote_addr}")
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        
+        app.logger.info(f"Login attempt for username: {username}")
+        
+        try:
+            # Robust user query
+            user = User.query.filter(User.username == username).first()
+            
+            if user is None:
+                app.logger.warning(f"Login failed: User {username} not found")
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Verify password
+            if not user.check_password(password):
+                app.logger.warning(f"Login failed: Incorrect password for user {username}")
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Successful login
+            login_user(user)
+            app.logger.info(f"Successful login for user: {username}")
+            return redirect(url_for('dashboard'))
+        
+        except Exception as e:
+            # Catch and log any unexpected errors
+            app.logger.error(f"Login error: {str(e)}")
+            flash('An unexpected error occurred. Please try again.', 'error')
+    
+    return render_template('login.html')
+
+# Database Initialization Function
+def initialize_database():
+    try:
+        # Configure database
+        configure_database(app)
+        
+        # Create application context
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            
+            # Check and create admin user if not exists
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+                admin_user = User(username='admin', is_admin=True)
+                admin_user.set_password(admin_password)
+                db.session.add(admin_user)
+                db.session.commit()
+                app.logger.info("Admin user created successfully")
+            else:
+                app.logger.info("Admin user already exists")
+        
+        app.logger.info("Database initialization successful")
+    
+    except Exception as e:
+        app.logger.critical(f"FATAL DATABASE INITIALIZATION ERROR: {str(e)}")
+        raise
+
+# Initialize database when the app is first loaded
+try:
+    initialize_database()
+except Exception as e:
+    app.logger.critical(f"Database initialization failed: {str(e)}")
+    # You might want to add more error handling here
+    raise
 
 # Vehicle Model
 class Vehicle(db.Model):
@@ -148,9 +238,15 @@ class Measurement(db.Model):
     pcs_count = db.Column(db.Integer, nullable=False)
     remarks = db.Column(db.Text)
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('You need administrator privileges to access this page.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 @login_required
@@ -202,44 +298,6 @@ def dashboard():
         top_parties=top_parties,
         recent_vehicles=recent_vehicles
     )
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # Add comprehensive logging for login attempts
-    app.logger.info(f"Login attempt from IP: {request.remote_addr}")
-    
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
-        
-        app.logger.info(f"Login attempt for username: {username}")
-        
-        try:
-            # More robust user query
-            user = User.query.filter(User.username == username).first()
-            
-            if user is None:
-                app.logger.warning(f"Login failed: User {username} not found")
-                flash('Invalid username or password', 'error')
-                return render_template('login.html')
-            
-            # Verify password
-            if not user.check_password(password):
-                app.logger.warning(f"Login failed: Incorrect password for user {username}")
-                flash('Invalid username or password', 'error')
-                return render_template('login.html')
-            
-            # Successful login
-            login_user(user)
-            app.logger.info(f"Successful login for user: {username}")
-            return redirect(url_for('dashboard'))
-        
-        except Exception as e:
-            # Catch and log any unexpected errors
-            app.logger.error(f"Login error: {str(e)}")
-            flash('An unexpected error occurred. Please try again.', 'error')
-    
-    return render_template('login.html')
 
 @app.route('/logout')
 @login_required
@@ -526,13 +584,11 @@ def export_data():
         
         data.append(row)
     
-    if pd is not None:
-        df = pd.DataFrame(data)
-        output = 'vehicles_report.xlsx'
-        df.to_excel(output, index=False)
-        return send_file(output, as_attachment=True, download_name='vehicles_report.xlsx')
-    else:
-        return jsonify({'error': 'Failed to export data'}), 500
+    import pandas as pd
+    df = pd.DataFrame(data)
+    output = 'vehicles_report.xlsx'
+    df.to_excel(output, index=False)
+    return send_file(output, as_attachment=True, download_name='vehicles_report.xlsx')
 
 if __name__ == '__main__':
     # Only enable debug mode in development
