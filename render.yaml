@@ -3,7 +3,10 @@ services:
     name: wvms
     env: python
     region: singapore  # Choose the region closest to your users
-    buildCommand: pip install -r requirements.txt && python init_db.py
+    buildCommand: |
+      pip install numpy==1.24.3
+      pip install -r requirements.txt
+      python init_db.py
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
@@ -14,6 +17,8 @@ services:
         generateValue: true
       - key: FLASK_APP
         value: app.py
+      - key: PYTHONPATH
+        value: /opt/render/project/src
     autoDeploy: true
     healthCheckPath: /login
     plan: free

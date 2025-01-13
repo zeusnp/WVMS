@@ -2,14 +2,16 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
-import pandas as pd
 import os
 from functools import wraps
 from dotenv import load_dotenv
 import sys
-load_dotenv()
 
+# Initialize Flask app
 app = Flask(__name__)
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
@@ -17,23 +19,28 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Database configuration
 if os.environ.get('FLASK_ENV') == 'production':
-    # Use PostgreSQL in production
     database_url = os.environ.get('DATABASE_URL', '')
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     print(f"Using production database: {database_url.split('@')[1] if '@' in database_url else 'postgres'}")
 else:
-    # Use SQLite in development
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
     print("Using development database: sqlite:///wvms.db")
 
+# Initialize extensions
 db = SQLAlchemy(app)
-
-# Initialize login manager
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Import pandas after app initialization
+try:
+    import pandas as pd
+    print("Successfully imported pandas")
+except ImportError as e:
+    print(f"Warning: Failed to import pandas: {str(e)}")
+    pd = None
 
 # Admin required decorator
 def admin_required(f):
@@ -433,12 +440,13 @@ def export_data():
         
         data.append(row)
     
-    df = pd.DataFrame(data)
-    
-    # Export to Excel
-    output = 'vehicles_report.xlsx'
-    df.to_excel(output, index=False)
-    return send_file(output, as_attachment=True, download_name='vehicles_report.xlsx')
+    if pd is not None:
+        df = pd.DataFrame(data)
+        output = 'vehicles_report.xlsx'
+        df.to_excel(output, index=False)
+        return send_file(output, as_attachment=True, download_name='vehicles_report.xlsx')
+    else:
+        return jsonify({'error': 'Failed to export data'}), 500
 
 if __name__ == '__main__':
     try:
