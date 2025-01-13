@@ -20,6 +20,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Database configuration
 if os.environ.get('FLASK_ENV') == 'production':
     try:
+        print("Configuring production database...")
         database_url = os.environ.get('DATABASE_URL')
         if not database_url:
             raise ValueError("DATABASE_URL environment variable not set")
@@ -28,21 +29,22 @@ if os.environ.get('FLASK_ENV') == 'production':
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Validate database URL format
-        if not database_url.startswith('postgresql://'):
-            raise ValueError(f"Invalid database URL format: {database_url}")
-            
+        # Configure SQLAlchemy for production
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        print(f"Using production database: {database_url.split('@')[1] if '@' in database_url else 'postgres'}")
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 5,
+            'max_overflow': 2,
+            'pool_timeout': 30,
+            'pool_recycle': 1800,
+        }
+        print("Production database configured successfully")
     except Exception as e:
-        print(f"Error configuring database: {str(e)}")
-        # Fallback to SQLite in case of configuration error
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
+        print(f"Error configuring production database: {str(e)}")
         print("Falling back to SQLite database")
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
 else:
-    # Use SQLite in development
+    print("Configuring development database...")
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
-    print("Using development database: sqlite:///wvms.db")
 
 # Initialize extensions
 try:

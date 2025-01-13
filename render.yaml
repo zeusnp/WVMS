@@ -4,8 +4,8 @@ services:
     env: python
     region: singapore
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --threads 8 --timeout 120
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: gunicorn app:app -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
