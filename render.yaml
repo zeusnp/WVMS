@@ -6,8 +6,9 @@ services:
     buildCommand: |
       pip install numpy==1.24.3
       pip install -r requirements.txt
+    startCommand: |
       python init_db.py
-    startCommand: gunicorn app:app
+      gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
@@ -17,8 +18,16 @@ services:
         generateValue: true
       - key: FLASK_APP
         value: app.py
+      - key: PORT
+        value: 10000
       - key: PYTHONPATH
         value: /opt/render/project/src
     autoDeploy: true
     healthCheckPath: /login
     plan: free
+
+databases:
+  - name: wvms_db
+    plan: free
+    databaseName: wvms
+    ipAllowList: []
