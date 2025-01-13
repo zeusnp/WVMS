@@ -7,6 +7,7 @@ import sys
 import logging
 from functools import wraps
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -92,8 +93,14 @@ def admin_required(f):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 # Vehicle Model
 class Vehicle(db.Model):
@@ -183,13 +190,17 @@ def dashboard():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form['username']
+        password = request.form['password']
+        
         user = User.query.filter_by(username=username).first()
-        if user and user.password == password:
+        
+        if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password')
+        else:
+            flash('Invalid username or password')
+    
     return render_template('login.html')
 
 @app.route('/logout')
@@ -217,7 +228,8 @@ def add_user():
         flash('Username already exists', 'error')
         return redirect(url_for('users'))
     
-    user = User(username=username, password=password, is_admin=is_admin)
+    user = User(username=username, is_admin=is_admin)
+    user.set_password(password)
     db.session.add(user)
     db.session.commit()
     flash('User added successfully')
@@ -244,7 +256,7 @@ def reset_password(user_id):
         
     user = User.query.get_or_404(user_id)
     data = request.get_json()
-    user.password = data.get('password')
+    user.set_password(data.get('password'))
     db.session.commit()
     return jsonify({'message': 'Password reset successfully'})
 
@@ -263,7 +275,7 @@ def edit_profile():
         confirm_password = request.form.get('confirm_password')
         
         # Verify current password
-        if not current_user.password == current_password:
+        if not current_user.check_password(current_password):
             flash('Current password is incorrect', 'error')
             return redirect(url_for('edit_profile'))
         
@@ -281,7 +293,7 @@ def edit_profile():
             if new_password != confirm_password:
                 flash('New passwords do not match', 'error')
                 return redirect(url_for('edit_profile'))
-            current_user.password = new_password
+            current_user.set_password(new_password)
         
         # Update username
         current_user.username = username
