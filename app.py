@@ -3,9 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
 import os
+import sys
+import logging
 from functools import wraps
 from dotenv import load_dotenv
-import sys
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -13,46 +18,49 @@ app = Flask(__name__)
 # Load environment variables
 load_dotenv()
 
-# Configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+# Secret Key Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
 
-# Database configuration
-if os.environ.get('FLASK_ENV') == 'production':
-    try:
-        print("Configuring production database...")
+# Database Configuration
+def configure_database(app):
+    # Determine database URL
+    if os.environ.get('FLASK_ENV') == 'production':
         database_url = os.environ.get('DATABASE_URL')
         
-        if database_url:
-            # Handle Render.com's DATABASE_URL format
-            if database_url.startswith('postgres://'):
-                database_url = database_url.replace('postgres://', 'postgresql://', 1)
-            
-            # Configure SQLAlchemy for production
-            app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-                'pool_size': 5,
-                'max_overflow': 2,
-                'pool_timeout': 30,
-                'pool_recycle': 1800,
-            }
-            print(f"Production database configured successfully with URL: {database_url.split('@')[1] if '@' in database_url else 'postgres'}")
-        else:
-            print("DATABASE_URL not found, falling back to SQLite...")
-            app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
-            
-    except Exception as e:
-        print(f"Error configuring production database: {str(e)}")
-        print("Falling back to SQLite database...")
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
-else:
-    print("Development environment detected...")
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
+        if not database_url:
+            logger.warning("DATABASE_URL not found. Falling back to SQLite.")
+            database_url = 'sqlite:///production.db'
+        
+        # Handle Render's PostgreSQL URL
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    else:
+        # Development environment
+        database_url = 'sqlite:///development.db'
+    
+    # Configure SQLAlchemy
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # Connection pooling and timeout settings
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_timeout': 30,
+        'pool_recycle': 3600,
+    }
+    
+    logger.info(f"Database configured with URL: {database_url}")
+    return database_url
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Configure database
+database_url = configure_database(app)
+
+# Initialize SQLAlchemy
+db = SQLAlchemy(app)
 
 # Initialize extensions
 try:
-    db = SQLAlchemy(app)
     print("Successfully initialized SQLAlchemy")
 except Exception as e:
     print(f"Error initializing SQLAlchemy: {str(e)}")

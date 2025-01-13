@@ -5,12 +5,9 @@ services:
     region: singapore
     plan: free
     buildCommand: |
-      echo "Setting up environment..."
-      chmod +x build.sh
-      ./build.sh
-    startCommand: |
-      echo "Starting Gunicorn server..."
-      gunicorn app:app -c gunicorn_config.py
+      python3 -m pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
@@ -20,14 +17,8 @@ services:
         generateValue: true
       - key: FLASK_APP
         value: app.py
-      - key: PORT
-        value: 10000
-      - key: WEB_CONCURRENCY
-        value: 4
       - key: PYTHONUNBUFFERED
         value: "true"
-      - key: GUNICORN_CMD_ARGS
-        value: "--log-level debug"
     envVarsFromDatabase:
       - key: DATABASE_URL
         fromDatabase:
@@ -35,17 +26,9 @@ services:
           property: connectionString
     healthCheckPath: /login
     autoDeploy: true
-    domains:
-      - wvms.onrender.com
-    disk:
-      name: wvms-data
-      mountPath: /data
-      sizeGB: 1
 
 databases:
   - name: wvms-db
     databaseName: wvms
     plan: free
     region: singapore
-    user: wvms_admin
-    ipAllowList: []
