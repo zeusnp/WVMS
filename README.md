@@ -1,89 +1,74 @@
-# Wood Carrying Vehicle Management System (WVMS)
+# Wood Vehicle Management System (WVMS)
 
-A comprehensive system for managing wood carrying vehicles, including vehicle tracking, measurements, and user management.
+A web-based application for managing wood vehicles and their measurements.
 
 ## Features
 
-- User Authentication and Authorization
-  - Admin-only access to user management
-  - Secure login system
-  
-- Dashboard
-  - Overview of total vehicles
-  - Vehicles left to measure
-  - Quick access to main functions
-  
-- Vehicle Management
-  - Add new vehicles with details
-  - Record vehicle measurements
-  - Sort and filter vehicle data
-  
-- Measurement Recording
-  - Grade-wise measurement recording (A, B, C, D)
-  - Automatic total calculation
-  - Additional measurements (PCS, Mix Total, 6 Futta)
-  
-- Data Export
-  - Export to Excel
-  - Export to PDF
-  - Customizable data sorting
+- User authentication and authorization
+- Vehicle management
+- Measurement tracking
+- Data export to Excel
+- Dark/Light mode
+- Responsive design
 
-## Installation
+## Local Development Setup
 
-1. Clone the repository:
+1. Clone the repository
 ```bash
-git clone [repository-url]
+git clone <repository-url>
+cd WVMS
 ```
 
-2. Create a virtual environment and activate it:
+2. Create a virtual environment and activate it
 ```bash
 python -m venv venv
-venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install the required packages:
+3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Initialize the database:
+4. Initialize the database
 ```bash
-python
->>> from app import app, db
->>> with app.app_context():
-...     db.create_all()
+python init_db.py
 ```
 
-5. Create an admin user:
-```python
->>> from app import User
->>> admin = User(username='admin', password='admin123', is_admin=True)
->>> db.session.add(admin)
->>> db.session.commit()
-```
-
-6. Run the application:
+5. Run the development server
 ```bash
 python app.py
 ```
 
-## Usage
+The application will be available at `http://localhost:5000`
 
-1. Login with admin credentials
-2. Add users through the User Management interface
-3. Add vehicles and their details
-4. Record measurements for vehicles
-5. Export data as needed
+## Deployment to Render.com
 
-## Security
+1. Create a [Render.com](https://render.com) account
 
-- Only admin users can manage other users
-- Passwords are stored securely
-- Session management for authenticated users
+2. Create a new Web Service:
+   - Connect your GitHub repository
+   - Select the Python environment
+   - Use the following settings:
+     - Build Command: `pip install -r requirements.txt`
+     - Start Command: `gunicorn app:app`
 
-## Requirements
+3. Add the following environment variables:
+   - `FLASK_ENV`: production
+   - `SECRET_KEY`: (generate a secure random string)
+   - `DATABASE_URL`: (will be automatically added by Render)
 
-- Python 3.7+
-- Flask
-- SQLAlchemy
-- Other dependencies listed in requirements.txt
+4. Deploy the application:
+   - Render will automatically deploy your application
+   - Any new commits to the main branch will trigger automatic deployments
+
+## Default Admin Account
+
+- Username: admin
+- Password: admin
+
+**Important**: Change the admin password after first login!
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

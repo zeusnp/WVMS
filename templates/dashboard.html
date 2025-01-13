@@ -1,150 +1,122 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - WVMS{% endblock %}
-
 {% block content %}
-<div class="container">
+<div class="container mt-4">
+    <!-- Quick Actions -->
     <div class="row mb-4">
-        <div class="col">
-            <h1 class="display-4">Wood Vehicle Management System</h1>
-            <p class="lead text-muted">Welcome to your vehicle management dashboard</p>
-            <hr>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card text-white bg-primary mb-3 h-100">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-truck"></i> Total Vehicles</h5>
-                </div>
-                <div class="card-body">
-                    <h2 class="card-title display-3">{{ total_vehicles }}</h2>
-                    <p class="card-text">Total vehicles registered in the system</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-white bg-warning mb-3 h-100">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Pending Measurements</h5>
-                </div>
-                <div class="card-body">
-                    <h2 class="card-title display-3">{{ vehicles_left }}</h2>
-                    <p class="card-text">Vehicles waiting to be measured</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-white bg-success mb-3 h-100">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-check-circle"></i> Measured Vehicles</h5>
-                </div>
-                <div class="card-body">
-                    <h2 class="card-title display-3">{{ total_vehicles - vehicles_left }}</h2>
-                    <p class="card-text">Vehicles with completed measurements</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">Quick Actions</h5>
-                </div>
                 <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('vehicles') }}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-plus-circle"></i> Add New Vehicle
+                    <h5 class="card-title">Quick Actions</h5>
+                    <div class="btn-group">
+                        <a href="{{ url_for('vehicles') }}" class="btn btn-primary">
+                            <i class="fas fa-truck"></i> Add Vehicle
                         </a>
-                        <a href="{{ url_for('vehicles') }}" class="btn btn-success btn-lg">
-                            <i class="bi bi-table"></i> View All Vehicles
+                        <a href="#" class="btn btn-success" onclick="exportData()">
+                            <i class="fas fa-file-export"></i> Export Data
                         </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">System Status</h5>
-                </div>
-                <div class="card-body">
-                    <div class="list-group">
-                        <div class="list-group-item">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">Measurement Completion Rate</h6>
-                                <small>{{ "%.1f"|format((total_vehicles - vehicles_left) / total_vehicles * 100 if total_vehicles > 0 else 0) }}%</small>
-                            </div>
-                            <div class="progress mt-2">
-                                <div class="progress-bar bg-success" role="progressbar" 
-                                     style="width: {{ (total_vehicles - vehicles_left) / total_vehicles * 100 if total_vehicles > 0 else 0 }}%">
-                                </div>
-                            </div>
-                        </div>
+                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#searchModal">
+                            <i class="fas fa-search"></i> Advanced Search
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Statistics Cards -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Grade Summary</h5>
-                </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Grade Type</th>
-                                    <th>Total Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for grade_type, amount in grade_data.items() %}
-                                <tr>
-                                    <td><strong>{{ grade_type }}</strong></td>
-                                    <td>{{ "%.2f"|format(amount) }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                    <h5 class="card-title">Total Vehicles</h5>
+                    <h2 class="card-text">{{ total_vehicles }}</h2>
                 </div>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Measured Today</h5>
+                    <h2 class="card-text">{{ measured_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Pending Measurements</h5>
+                    <h2 class="card-text">{{ pending_measurements }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Total Grade</h5>
+                    <h2 class="card-text">{{ total_grade }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Charts Row -->
+    <div class="row mb-4">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="bi bi-trophy"></i> Top Parties by Total Grade</h5>
-                </div>
                 <div class="card-body">
+                    <h5 class="card-title">Grade Distribution</h5>
+                    <canvas id="gradeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Top Parties</h5>
+                    <canvas id="partyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Activity</h5>
                     <div class="table-responsive">
-                        <table class="table table-bordered">
-                            <thead class="table-light">
+                        <table class="table table-hover">
+                            <thead>
                                 <tr>
+                                    <th>Date</th>
+                                    <th>Vehicle No</th>
                                     <th>Party Name</th>
-                                    <th>Total Grade</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for party in party_data %}
+                                {% for vehicle in recent_vehicles %}
                                 <tr>
-                                    <td><strong>{{ party.name }}</strong></td>
-                                    <td>{{ "%.2f"|format(party.total) }}</td>
+                                    <td>{{ vehicle.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ vehicle.vehicle_no }}</td>
+                                    <td>{{ vehicle.party_name }}</td>
+                                    <td>
+                                        {% if vehicle.is_measured %}
+                                        <span class="badge bg-success">Measured</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('measurements', vehicle_id=vehicle.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
                                 </tr>
                                 {% endfor %}
-                                {% if not party_data %}
-                                <tr>
-                                    <td colspan="2" class="text-center">No data available</td>
-                                </tr>
-                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -153,4 +125,101 @@
         </div>
     </div>
 </div>
+
+<!-- Search Modal -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Advanced Search</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="searchForm">
+                    <div class="mb-3">
+                        <label class="form-label">Date Range</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="start_date">
+                            <span class="input-group-text">to</span>
+                            <input type="date" class="form-control" name="end_date">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Party Name</label>
+                        <input type="text" class="form-control" name="party_name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Vehicle Type</label>
+                        <select class="form-select" name="vehicle_type">
+                            <option value="">All Types</option>
+                            <option value="Truck">Truck</option>
+                            <option value="Pickup">Pickup</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="searchVehicles()">Search</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Grade Distribution Chart
+    const gradeCtx = document.getElementById('gradeChart').getContext('2d');
+    new Chart(gradeCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Grade A', 'Grade B', 'Grade C', 'Grade D'],
+            datasets: [{
+                data: [
+                    {{ grade_data['Grade A'] }},
+                    {{ grade_data['Grade B'] }},
+                    {{ grade_data['Grade C'] }},
+                    {{ grade_data['Grade D'] }}
+                ],
+                backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545']
+            }]
+        }
+    });
+
+    // Top Parties Chart
+    const partyCtx = document.getElementById('partyChart').getContext('2d');
+    new Chart(partyCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ top_parties|map(attribute='party_name')|list|tojson }},
+            datasets: [{
+                label: 'Total Grade',
+                data: {{ top_parties|map(attribute='total')|list|tojson }},
+                backgroundColor: '#007bff'
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Search functionality
+    function searchVehicles() {
+        const formData = new FormData(document.getElementById('searchForm'));
+        const params = new URLSearchParams(formData);
+        window.location.href = `/vehicles?${params.toString()}`;
+    }
+
+    // Export functionality
+    function exportData() {
+        window.location.href = "{{ url_for('export_data') }}";
+    }
+</script>
 {% endblock %}

@@ -11,8 +11,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
 
 # Database configuration
 if os.environ.get('FLASK_ENV') == 'production':
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///wvms.db')
+    # Use PostgreSQL in production
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://')
 else:
+    # Use SQLite in development
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -76,12 +78,23 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def dashboard():
+    # Get basic statistics
+    total_vehicles = Vehicle.query.count()
+    today = datetime.now().date()
+    measured_today = Vehicle.query.join(Measurement).filter(
+        db.func.date(Vehicle.date) == today
+    ).count()
+    pending_measurements = Vehicle.query.filter(
+        ~Vehicle.id.in_(db.session.query(Measurement.vehicle_id))
+    ).count()
+
     # Get grade summaries
     grade_summary = db.session.query(
         db.func.sum(Measurement.grade_a).label('total_grade_a'),
         db.func.sum(Measurement.grade_b).label('total_grade_b'),
         db.func.sum(Measurement.grade_c).label('total_grade_c'),
-        db.func.sum(Measurement.grade_d).label('total_grade_d')
+        db.func.sum(Measurement.grade_d).label('total_grade_d'),
+        db.func.sum(Measurement.total_grade).label('total_grade')
     ).first()
 
     # Get top parties by total grade
@@ -92,6 +105,9 @@ def dashboard():
     .order_by(db.func.sum(Measurement.total_grade).desc())\
     .limit(5).all()
 
+    # Get recent vehicles
+    recent_vehicles = Vehicle.query.order_by(Vehicle.date.desc()).limit(10).all()
+
     # Format the data
     grade_data = {
         'Grade A': float(grade_summary.total_grade_a or 0),
@@ -100,20 +116,15 @@ def dashboard():
         'Grade D': float(grade_summary.total_grade_d or 0)
     }
 
-    party_data = [
-        {'name': party.party_name, 'total': float(party.total)}
-        for party in top_parties
-    ]
-
-    total_vehicles = Vehicle.query.count()
-    measured_vehicles = Measurement.query.count()
-    vehicles_left = total_vehicles - measured_vehicles
-
-    return render_template('dashboard.html', 
-                         grade_data=grade_data,
-                         party_data=party_data,
-                         total_vehicles=total_vehicles, 
-                         vehicles_left=vehicles_left)
+    return render_template('dashboard.html',
+        total_vehicles=total_vehicles,
+        measured_today=measured_today,
+        pending_measurements=pending_measurements,
+        total_grade=float(grade_summary.total_grade or 0),
+        grade_data=grade_data,
+        top_parties=top_parties,
+        recent_vehicles=recent_vehicles
+    )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -183,55 +194,96 @@ def reset_password(user_id):
     db.session.commit()
     return jsonify({'message': 'Password reset successfully'})
 
-@app.route('/edit_profile', methods=['POST'])
+@app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
-@admin_required
 def edit_profile():
-    # Get form data
-    username = request.form.get('username')
-    current_password = request.form.get('current_password')
-    new_password = request.form.get('new_password')
-    
-    # Verify current password
-    if not current_user.password == current_password:
-        flash('Current password is incorrect', 'error')
-        return redirect(url_for('users'))
-    
-    # Check if username already exists (except for current user)
-    existing_user = User.query.filter_by(username=username).first()
-    if existing_user and existing_user.id != current_user.id:
-        flash('Username already exists', 'error')
-        return redirect(url_for('users'))
-    
-    # Update username
-    current_user.username = username
-    
-    # Update password if provided
-    if new_password:
-        current_user.password = new_password
-    
-    db.session.commit()
-    flash('Profile updated successfully')
-    return redirect(url_for('users'))
+    if request.method == 'GET':
+        return render_template('edit_profile.html', user=current_user)
+        
+    # Handle POST request
+    try:
+        # Get form data
+        username = request.form.get('username')
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Verify current password
+        if not current_user.password == current_password:
+            flash('Current password is incorrect', 'error')
+            return redirect(url_for('edit_profile'))
+        
+        # Check if username already exists (except for current user)
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user and existing_user.id != current_user.id:
+            flash('Username already exists', 'error')
+            return redirect(url_for('edit_profile'))
+        
+        # Validate new password
+        if new_password:
+            if not confirm_password:
+                flash('Please confirm your new password', 'error')
+                return redirect(url_for('edit_profile'))
+            if new_password != confirm_password:
+                flash('New passwords do not match', 'error')
+                return redirect(url_for('edit_profile'))
+            current_user.password = new_password
+        
+        # Update username
+        current_user.username = username
+        
+        # Save changes
+        db.session.commit()
+        flash('Profile updated successfully', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating profile: {str(e)}', 'error')
+        return redirect(url_for('edit_profile'))
 
 @app.route('/vehicles', methods=['GET', 'POST'])
 @login_required
 def vehicles():
     if request.method == 'POST':
-        new_vehicle = Vehicle(
-            date=datetime.strptime(request.form['date'], '%Y-%m-%d'),
-            vehicle_no=request.form['vehicle_no'],
-            party_name=request.form['party_name'],
-            sub_party_name=request.form['sub_party_name'],
-            vehicle_fare=float(request.form['vehicle_fare']),
-            vehicle_type=request.form['vehicle_type']
-        )
-        db.session.add(new_vehicle)
-        db.session.commit()
-        flash('Vehicle added successfully')
-        return redirect(url_for('vehicles'))
-    
-    vehicles = Vehicle.query.all()
+        try:
+            new_vehicle = Vehicle(
+                date=datetime.strptime(request.form['date'], '%Y-%m-%d'),
+                vehicle_no=request.form['vehicle_no'],
+                party_name=request.form['party_name'],
+                sub_party_name=request.form['sub_party_name'],
+                vehicle_fare=float(request.form['vehicle_fare']),
+                vehicle_type=request.form['vehicle_type']
+            )
+            db.session.add(new_vehicle)
+            db.session.commit()
+            flash('Vehicle added successfully', 'success')
+            return redirect(url_for('vehicles'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding vehicle: {str(e)}', 'error')
+            return redirect(url_for('vehicles'))
+
+    # Get search parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    party_name = request.args.get('party_name')
+    vehicle_type = request.args.get('vehicle_type')
+
+    # Build query
+    query = Vehicle.query
+
+    if start_date:
+        query = query.filter(Vehicle.date >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        query = query.filter(Vehicle.date <= datetime.strptime(end_date, '%Y-%m-%d'))
+    if party_name:
+        query = query.filter(Vehicle.party_name.ilike(f'%{party_name}%'))
+    if vehicle_type:
+        query = query.filter(Vehicle.vehicle_type == vehicle_type)
+
+    # Get results
+    vehicles = query.order_by(Vehicle.date.desc()).all()
     return render_template('vehicles.html', vehicles=vehicles)
 
 @app.route('/delete_vehicle/<int:vehicle_id>', methods=['POST'])
@@ -252,33 +304,44 @@ def measurements(vehicle_id):
     vehicle = Vehicle.query.get_or_404(vehicle_id)
     
     if request.method == 'POST':
-        if vehicle.measurement:
-            flash('Measurement already exists for this vehicle')
+        try:
+            # Check if measurement already exists
+            existing_measurement = Measurement.query.filter_by(vehicle_id=vehicle_id).first()
+            if existing_measurement:
+                flash('Measurement already exists for this vehicle', 'error')
+                return redirect(url_for('measurements', vehicle_id=vehicle_id))
+
+            # Calculate total grade
+            grade_a = float(request.form['grade_a'])
+            grade_b = float(request.form['grade_b'])
+            grade_c = float(request.form['grade_c'])
+            grade_d = float(request.form['grade_d'])
+            total_grade = grade_a + grade_b + grade_c + grade_d
+
+            new_measurement = Measurement(
+                vehicle_id=vehicle_id,
+                grade_a=grade_a,
+                grade_b=grade_b,
+                grade_c=grade_c,
+                grade_d=grade_d,
+                total_grade=total_grade,
+                pcs=int(request.form['pcs']),
+                mix_total=float(request.form['mix_total']),
+                six_futta=float(request.form['six_futta']),
+                pcs_count=int(request.form['pcs_count']),
+                remarks=request.form.get('remarks', '')
+            )
+            db.session.add(new_measurement)
+            db.session.commit()
+            flash('Measurement added successfully', 'success')
             return redirect(url_for('vehicles'))
-            
-        measurement = Measurement(
-            vehicle_id=vehicle_id,
-            grade_a=float(request.form['grade_a']),
-            grade_b=float(request.form['grade_b']),
-            grade_c=float(request.form['grade_c']),
-            grade_d=float(request.form['grade_d']),
-            total_grade=float(request.form['total_grade']),
-            pcs=int(request.form['pcs']),
-            mix_total=float(request.form['mix_total']),
-            six_futta=float(request.form['six_futta']),
-            pcs_count=int(request.form['pcs_count']),
-            remarks=request.form['remarks']
-        )
-        db.session.add(measurement)
-        db.session.commit()
-        flash('Measurement added successfully')
-        return redirect(url_for('vehicles'))
-    
-    if vehicle.measurement:
-        flash('Measurement already exists for this vehicle')
-        return redirect(url_for('vehicles'))
-    
-    return render_template('measurements.html', vehicle=vehicle)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding measurement: {str(e)}', 'error')
+            return redirect(url_for('measurements', vehicle_id=vehicle_id))
+
+    measurement = Measurement.query.filter_by(vehicle_id=vehicle_id).first()
+    return render_template('measurements.html', vehicle=vehicle, measurement=measurement)
 
 @app.route('/delete_measurement/<int:vehicle_id>', methods=['POST'])
 @login_required
