@@ -22,6 +22,10 @@ else
     echo "DATABASE_URL is properly set."
 fi
 
+# Run database migrations
+echo "Running database migrations..."
+flask db upgrade
+
 # Initialize the database
 echo "Starting database initialization..."
 python <<EOF
@@ -51,5 +55,9 @@ with app.app_context():
         print(f"Error during database setup: {str(e)}")
         exit(1)
 EOF
+
+# Optional: Recreate admin user if needed
+echo "Recreating admin user if needed..."
+python recreate_db.py
 
 echo "Build process completed!"

@@ -8,6 +8,7 @@ import logging
 from functools import wraps
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_migrate import Migrate
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,43 +30,50 @@ def configure_database(app):
         database_url = os.environ.get('DATABASE_URL')
         
         if not database_url:
-            logger.warning("DATABASE_URL not found. Falling back to SQLite.")
-            database_url = 'sqlite:///production.db'
+            logger.error("DATABASE_URL not found. Cannot connect to database.")
+            raise ValueError("DATABASE_URL environment variable is required in production")
         
-        # Handle Render's PostgreSQL URL
+        # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        # Additional connection options for production
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 10,
+            'max_overflow': 20,
+            'pool_timeout': 30,
+            'pool_recycle': 3600,
+        }
     else:
-        # Development environment
+        # Development environment fallback
         database_url = 'sqlite:///development.db'
     
     # Configure SQLAlchemy
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
-    # Connection pooling and timeout settings
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_size': 10,
-        'max_overflow': 20,
-        'pool_timeout': 30,
-        'pool_recycle': 3600,
-    }
-    
     logger.info(f"Database configured with URL: {database_url}")
     return database_url
 
-# Configure database
-database_url = configure_database(app)
-
-# Initialize SQLAlchemy
-db = SQLAlchemy(app)
-
-# Initialize extensions
+# Configure database before initializing
 try:
-    print("Successfully initialized SQLAlchemy")
+    database_url = configure_database(app)
+    
+    # Initialize SQLAlchemy
+    db = SQLAlchemy(app)
+    
+    # Initialize Flask-Migrate
+    migrate = Migrate(app, db)
+    
+    # Create tables if not exists (safe for production)
+    with app.app_context():
+        db.create_all()
+    
+    logger.info("Database initialization successful")
+
 except Exception as e:
-    print(f"Error initializing SQLAlchemy: {str(e)}")
-    sys.exit(1)
+    logger.error(f"Database initialization failed: {e}")
+    raise
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -91,6 +99,7 @@ def admin_required(f):
 
 # User Model
 class User(UserMixin, db.Model):
+    __tablename__ = 'users'  # Change table name to avoid reserved keyword
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -104,6 +113,7 @@ class User(UserMixin, db.Model):
 
 # Vehicle Model
 class Vehicle(db.Model):
+    __tablename__ = 'vehicles'  # Explicitly set table name
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime, nullable=False)
     vehicle_no = db.Column(db.String(50), nullable=False)
@@ -119,8 +129,9 @@ class Vehicle(db.Model):
 
 # Measurement Model
 class Measurement(db.Model):
+    __tablename__ = 'measurements'  # Explicitly set table name
     id = db.Column(db.Integer, primary_key=True)
-    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False)
     grade_a = db.Column(db.Float, nullable=False)
     grade_b = db.Column(db.Float, nullable=False)
     grade_c = db.Column(db.Float, nullable=False)
@@ -497,15 +508,6 @@ def export_data():
         return jsonify({'error': 'Failed to export data'}), 500
 
 if __name__ == '__main__':
-    try:
-        with app.app_context():
-            print("Creating database tables...")
-            db.create_all()
-            print("Database tables created successfully!")
-    except Exception as e:
-        print(f"Error creating database tables: {str(e)}")
-        sys.exit(1)
-
     # Only enable debug mode in development
     debug = os.environ.get('FLASK_ENV') != 'production'
     port = int(os.environ.get('PORT', 5000))
