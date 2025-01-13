@@ -1,8 +1,14 @@
-from app import app, db, User
-import logging
 import sys
 import os
+import logging
 import traceback
+
+# Print current working directory and Python path for debugging
+print("Current Working Directory:", os.getcwd())
+print("Python Path:", sys.path)
+
+# Ensure the parent directory is in the Python path
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # Configure logging
 logging.basicConfig(
@@ -14,6 +20,15 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+try:
+    # Import the app and create a reference to the database
+    from app import app, db
+    from app import User  # Explicitly import User from app
+except Exception as e:
+    print("Import Error:", str(e))
+    print("Traceback:", traceback.format_exc())
+    sys.exit(1)
 
 def check_database_connection():
     try:
