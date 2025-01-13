@@ -22,7 +22,6 @@ services:
         value: "true"
       - key: ADMIN_PASSWORD
         generateValue: true
-    envVarsFromDatabase:
       - key: DATABASE_URL
         fromDatabase:
           name: wvms-db

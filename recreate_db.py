@@ -15,8 +15,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def check_database_connection():
+    try:
+        with app.app_context():
+            # Attempt to connect to the database
+            db.session.execute('SELECT 1')
+            logger.info("Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
+
 def recreate_database():
     try:
+        # First, check database connection
+        if not check_database_connection():
+            logger.critical("Cannot recreate database: Connection failed")
+            raise ConnectionError("Database connection failed")
+
         with app.app_context():
             # Drop all tables
             logger.info("Dropping existing tables...")
@@ -43,6 +60,11 @@ def recreate_database():
 
 def verify_admin_user():
     try:
+        # First, check database connection
+        if not check_database_connection():
+            logger.critical("Cannot verify admin user: Connection failed")
+            raise ConnectionError("Database connection failed")
+
         with app.app_context():
             # Check if admin user exists
             admin = User.query.filter_by(username='admin').first()
@@ -72,6 +94,11 @@ def verify_admin_user():
 
 def list_users():
     try:
+        # First, check database connection
+        if not check_database_connection():
+            logger.critical("Cannot list users: Connection failed")
+            raise ConnectionError("Database connection failed")
+
         with app.app_context():
             users = User.query.all()
             logger.info("Current users in the database:")
@@ -83,6 +110,12 @@ def list_users():
         raise
 
 if __name__ == '__main__':
+    # Ensure DATABASE_URL is set
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        logger.critical("DATABASE_URL is not set. Cannot proceed.")
+        sys.exit(1)
+
     # Choose the appropriate action based on environment
     env = os.environ.get('FLASK_ENV', 'development')
     

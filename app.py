@@ -61,19 +61,22 @@ def configure_database(app):
         # Determine database URL
         database_url = os.environ.get('DATABASE_URL')
         
+        # Fallback to environment-specific default if no DATABASE_URL
         if not database_url:
-            app.logger.critical("DATABASE_URL not found. Cannot connect to database.")
-            raise ValueError("DATABASE_URL environment variable is REQUIRED")
+            env = os.environ.get('FLASK_ENV', 'development')
+            if env == 'production':
+                raise ValueError("DATABASE_URL is REQUIRED in production environment")
+            database_url = 'sqlite:///development.db'
         
         # Ensure PostgreSQL URL is in the correct format for SQLAlchemy
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Configure SQLAlchemy
+        # Mandatory configuration of database URI
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         
-        # Connection pooling and timeout settings
+        # Additional configuration
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'pool_size': 10,
             'max_overflow': 20,
@@ -81,6 +84,7 @@ def configure_database(app):
             'pool_recycle': 3600,
         }
         
+        # Logging
         app.logger.info(f"Database configured with URL: {database_url}")
         return database_url
     
@@ -88,9 +92,48 @@ def configure_database(app):
         app.logger.critical(f"FATAL DATABASE CONFIG ERROR: {str(e)}")
         raise
 
-# Initialize SQLAlchemy and Migrate
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+# Database Initialization Function
+def initialize_database():
+    try:
+        # Ensure database URL is configured BEFORE initializing SQLAlchemy
+        database_url = configure_database(app)
+        
+        # Initialize SQLAlchemy AFTER configuring database
+        db = SQLAlchemy(app)
+        
+        # Initialize Flask-Migrate
+        migrate = Migrate(app, db)
+        
+        # Create application context
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            
+            # Check and create admin user if not exists
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+                admin_user = User(username='admin', is_admin=True)
+                admin_user.set_password(admin_password)
+                db.session.add(admin_user)
+                db.session.commit()
+                app.logger.info("Admin user created successfully")
+            else:
+                app.logger.info("Admin user already exists")
+        
+        app.logger.info("Database initialization successful")
+        return db
+    
+    except Exception as e:
+        app.logger.critical(f"FATAL DATABASE INITIALIZATION ERROR: {str(e)}")
+        raise
+
+# Initialize database when the app is first loaded
+try:
+    db = initialize_database()
+except Exception as e:
+    app.logger.critical(f"Database initialization failed: {str(e)}")
+    raise
 
 # User Model with Enhanced Logging
 class User(UserMixin, db.Model):
@@ -168,43 +211,6 @@ def login():
             flash('An unexpected error occurred. Please try again.', 'error')
     
     return render_template('login.html')
-
-# Database Initialization Function
-def initialize_database():
-    try:
-        # Configure database
-        configure_database(app)
-        
-        # Create application context
-        with app.app_context():
-            # Create all tables
-            db.create_all()
-            
-            # Check and create admin user if not exists
-            admin_user = User.query.filter_by(username='admin').first()
-            if not admin_user:
-                admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-                admin_user = User(username='admin', is_admin=True)
-                admin_user.set_password(admin_password)
-                db.session.add(admin_user)
-                db.session.commit()
-                app.logger.info("Admin user created successfully")
-            else:
-                app.logger.info("Admin user already exists")
-        
-        app.logger.info("Database initialization successful")
-    
-    except Exception as e:
-        app.logger.critical(f"FATAL DATABASE INITIALIZATION ERROR: {str(e)}")
-        raise
-
-# Initialize database when the app is first loaded
-try:
-    initialize_database()
-except Exception as e:
-    app.logger.critical(f"Database initialization failed: {str(e)}")
-    # You might want to add more error handling here
-    raise
 
 # Vehicle Model
 class Vehicle(db.Model):
