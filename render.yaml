@@ -4,8 +4,13 @@ services:
     env: python
     region: singapore
     plan: free
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn app:app -c gunicorn_config.py
+    buildCommand: |
+      echo "Setting up environment..."
+      chmod +x build.sh
+      ./build.sh
+    startCommand: |
+      echo "Starting Gunicorn server..."
+      gunicorn app:app -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
@@ -19,6 +24,10 @@ services:
         value: 10000
       - key: WEB_CONCURRENCY
         value: 4
+      - key: PYTHONUNBUFFERED
+        value: "true"
+      - key: GUNICORN_CMD_ARGS
+        value: "--log-level debug"
     healthCheckPath: /login
     autoDeploy: true
     domains:
