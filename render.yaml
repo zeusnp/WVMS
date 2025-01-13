@@ -2,8 +2,9 @@ services:
   - type: web
     name: wvms
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    region: singapore  # Choose the region closest to your users
+    buildCommand: "./build.sh"  # This will install dependencies and initialize the database
+    startCommand: "gunicorn app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.12
@@ -11,4 +12,8 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
+      - key: FLASK_APP
+        value: app.py
+    autoDeploy: true
+    healthCheckPath: /login
     plan: free

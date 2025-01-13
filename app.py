@@ -5,19 +5,25 @@ from datetime import datetime
 import pandas as pd
 import os
 from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
+
+# Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Database configuration
 if os.environ.get('FLASK_ENV') == 'production':
     # Use PostgreSQL in production
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://')
+    database_url = os.environ.get('DATABASE_URL', '')
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
     # Use SQLite in development
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -432,4 +438,7 @@ def export_data():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    # Only enable debug mode in development
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=debug)
