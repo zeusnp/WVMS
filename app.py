@@ -15,36 +15,40 @@ load_dotenv()
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Database configuration
 if os.environ.get('FLASK_ENV') == 'production':
     try:
         print("Configuring production database...")
         database_url = os.environ.get('DATABASE_URL')
-        if not database_url:
-            raise ValueError("DATABASE_URL environment variable not set")
-            
-        # Handle Render.com's DATABASE_URL format
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Configure SQLAlchemy for production
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_size': 5,
-            'max_overflow': 2,
-            'pool_timeout': 30,
-            'pool_recycle': 1800,
-        }
-        print("Production database configured successfully")
+        if database_url:
+            # Handle Render.com's DATABASE_URL format
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            
+            # Configure SQLAlchemy for production
+            app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                'pool_size': 5,
+                'max_overflow': 2,
+                'pool_timeout': 30,
+                'pool_recycle': 1800,
+            }
+            print(f"Production database configured successfully with URL: {database_url.split('@')[1] if '@' in database_url else 'postgres'}")
+        else:
+            print("DATABASE_URL not found, falling back to SQLite...")
+            app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
+            
     except Exception as e:
         print(f"Error configuring production database: {str(e)}")
-        print("Falling back to SQLite database")
+        print("Falling back to SQLite database...")
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
 else:
-    print("Configuring development database...")
+    print("Development environment detected...")
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wvms.db'
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
 try:

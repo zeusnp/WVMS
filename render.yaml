@@ -28,6 +28,11 @@ services:
         value: "true"
       - key: GUNICORN_CMD_ARGS
         value: "--log-level debug"
+    envVarsFromDatabase:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wvms-db
+          property: connectionString
     healthCheckPath: /login
     autoDeploy: true
     domains:
@@ -39,9 +44,8 @@ services:
 
 databases:
   - name: wvms-db
-    plan: free
-    type: postgres
-    region: singapore
     databaseName: wvms
+    plan: free
+    region: singapore
     user: wvms_admin
     ipAllowList: []
