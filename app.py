@@ -55,7 +55,7 @@ app = setup_logging(app)
 # Secret Key Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
 
-# Comprehensive Database Configuration
+# Configure database before creating models
 def configure_database(app):
     try:
         # Determine database URL
@@ -92,21 +92,77 @@ def configure_database(app):
         app.logger.critical(f"FATAL DATABASE CONFIG ERROR: {str(e)}")
         raise
 
+# Configure database first
+configure_database(app)
+
+# Initialize SQLAlchemy
+db = SQLAlchemy(app)
+
+# User Model with Enhanced Logging
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+
+    def set_password(self, password):
+        try:
+            self.password_hash = generate_password_hash(password)
+            app.logger.info(f"Password set for user: {self.username}")
+        except Exception as e:
+            app.logger.error(f"Password set failed for user {self.username}: {str(e)}")
+            raise
+
+    def check_password(self, password):
+        try:
+            is_valid = check_password_hash(self.password_hash, password)
+            if not is_valid:
+                app.logger.warning(f"Invalid password attempt for user: {self.username}")
+            return is_valid
+        except Exception as e:
+            app.logger.error(f"Password check failed for user {self.username}: {str(e)}")
+            return False
+
+# Vehicle Model
+class Vehicle(db.Model):
+    __tablename__ = 'vehicles'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    vehicle_no = db.Column(db.String(50), nullable=False)
+    party_name = db.Column(db.String(100), nullable=False)
+    sub_party_name = db.Column(db.String(100))
+    vehicle_fare = db.Column(db.Float, nullable=False)
+    vehicle_type = db.Column(db.String(50), nullable=False)
+    
+    # Relationship with Measurement
+    measurement = db.relationship('Measurement', backref='vehicle', uselist=False)
+
+    def is_measured(self):
+        return self.measurement is not None
+
+# Measurement Model
+class Measurement(db.Model):
+    __tablename__ = 'measurements'
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False)
+    grade_a = db.Column(db.Float, nullable=False)
+    grade_b = db.Column(db.Float, nullable=False)
+    grade_c = db.Column(db.Float, nullable=False)
+    grade_d = db.Column(db.Float, nullable=False)
+    total_grade = db.Column(db.Float, nullable=False)
+    pcs = db.Column(db.Integer, nullable=False)
+    mix_total = db.Column(db.Float, nullable=False)
+    six_futta = db.Column(db.Float, nullable=False)
+    pcs_count = db.Column(db.Integer, nullable=False)
+    remarks = db.Column(db.Text)
+
 # Database Initialization Function
 def initialize_database():
     try:
-        # Ensure database URL is configured BEFORE initializing SQLAlchemy
-        database_url = configure_database(app)
-        
-        # Initialize SQLAlchemy AFTER configuring database
-        db = SQLAlchemy(app)
-        
-        # Initialize Flask-Migrate
-        migrate = Migrate(app, db)
-        
         # Create application context
         with app.app_context():
-            # Create all tables
+            # Ensure ALL tables are created BEFORE any queries
             db.create_all()
             
             # Check and create admin user if not exists
@@ -135,32 +191,6 @@ except Exception as e:
     app.logger.critical(f"Database initialization failed: {str(e)}")
     raise
 
-# User Model with Enhanced Logging
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-
-    def set_password(self, password):
-        try:
-            self.password_hash = generate_password_hash(password)
-            app.logger.info(f"Password set for user: {self.username}")
-        except Exception as e:
-            app.logger.error(f"Password set failed for user {self.username}: {str(e)}")
-            raise
-
-    def check_password(self, password):
-        try:
-            is_valid = check_password_hash(self.password_hash, password)
-            if not is_valid:
-                app.logger.warning(f"Invalid password attempt for user: {self.username}")
-            return is_valid
-        except Exception as e:
-            app.logger.error(f"Password check failed for user {self.username}: {str(e)}")
-            return False
-
 # Login Manager Configuration
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -173,6 +203,16 @@ def load_user(user_id):
     except Exception as e:
         app.logger.error(f"User load error for ID {user_id}: {str(e)}")
         return None
+
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('You need administrator privileges to access this page.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Login Route with Comprehensive Error Handling
 @app.route('/login', methods=['GET', 'POST'])
@@ -211,48 +251,6 @@ def login():
             flash('An unexpected error occurred. Please try again.', 'error')
     
     return render_template('login.html')
-
-# Vehicle Model
-class Vehicle(db.Model):
-    __tablename__ = 'vehicles'  # Explicitly set table name
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.DateTime, nullable=False)
-    vehicle_no = db.Column(db.String(50), nullable=False)
-    party_name = db.Column(db.String(100), nullable=False)
-    sub_party_name = db.Column(db.String(100))
-    vehicle_fare = db.Column(db.Float, nullable=False)
-    vehicle_type = db.Column(db.String(50), nullable=False)
-    measurement = db.relationship('Measurement', backref='vehicle', uselist=False)
-
-    @property
-    def is_measured(self):
-        return self.measurement is not None
-
-# Measurement Model
-class Measurement(db.Model):
-    __tablename__ = 'measurements'  # Explicitly set table name
-    id = db.Column(db.Integer, primary_key=True)
-    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False)
-    grade_a = db.Column(db.Float, nullable=False)
-    grade_b = db.Column(db.Float, nullable=False)
-    grade_c = db.Column(db.Float, nullable=False)
-    grade_d = db.Column(db.Float, nullable=False)
-    total_grade = db.Column(db.Float, nullable=False)
-    pcs = db.Column(db.Integer, nullable=False)
-    mix_total = db.Column(db.Float, nullable=False)
-    six_futta = db.Column(db.Float, nullable=False)
-    pcs_count = db.Column(db.Integer, nullable=False)
-    remarks = db.Column(db.Text)
-
-# Admin required decorator
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            flash('You need administrator privileges to access this page.', 'error')
-            return redirect(url_for('dashboard'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 @app.route('/')
 @login_required
