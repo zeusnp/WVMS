@@ -1,0 +1,2 @@
+Database migration scripts for the WVMS project.
+Use Flask-Migrate to manage database schema changes.

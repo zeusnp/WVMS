@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Actions</h5>
+                    <div class="btn-group">
+                        <a href="{{ url_for('vehicles') }}" class="btn btn-primary">
+                            <i class="fas fa-truck"></i> Add Vehicle
+                        </a>
+                        <a href="#" class="btn btn-success" onclick="exportData()">
+                            <i class="fas fa-file-export"></i> Export Data
+                        </a>
+                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#searchModal">
+                            <i class="fas fa-search"></i> Advanced Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Total Vehicles</h5>
+                    <h2 class="card-text">{{ total_vehicles }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Measured Today</h5>
+                    <h2 class="card-text">{{ measured_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Pending Measurements</h5>
+                    <h2 class="card-text">{{ pending_measurements }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Total Grade</h5>
+                    <h2 class="card-text">{{ total_grade }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Grade Distribution</h5>
+                    <canvas id="gradeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Top Parties</h5>
+                    <canvas id="partyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Activity</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Vehicle No</th>
+                                    <th>Party Name</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vehicle in recent_vehicles %}
+                                <tr>
+                                    <td>{{ vehicle.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ vehicle.vehicle_no }}</td>
+                                    <td>{{ vehicle.party_name }}</td>
+                                    <td>
+                                        {% if vehicle.is_measured %}
+                                        <span class="badge bg-success">Measured</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('measurements', vehicle_id=vehicle.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search Modal -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Advanced Search</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="searchForm">
+                    <div class="mb-3">
+                        <label class="form-label">Date Range</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="start_date">
+                            <span class="input-group-text">to</span>
+                            <input type="date" class="form-control" name="end_date">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Party Name</label>
+                        <input type="text" class="form-control" name="party_name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Vehicle Type</label>
+                        <select class="form-select" name="vehicle_type">
+                            <option value="">All Types</option>
+                            <option value="Truck">Truck</option>
+                            <option value="Pickup">Pickup</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="searchVehicles()">Search</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Grade Distribution Chart
+    const gradeCtx = document.getElementById('gradeChart').getContext('2d');
+    new Chart(gradeCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Grade A', 'Grade B', 'Grade C', 'Grade D'],
+            datasets: [{
+                data: [
+                    {{ grade_data['Grade A'] }},
+                    {{ grade_data['Grade B'] }},
+                    {{ grade_data['Grade C'] }},
+                    {{ grade_data['Grade D'] }}
+                ],
+                backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545']
+            }]
+        }
+    });
+
+    // Top Parties Chart
+    const partyCtx = document.getElementById('partyChart').getContext('2d');
+    new Chart(partyCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ top_parties|map(attribute='party_name')|list|tojson }},
+            datasets: [{
+                label: 'Total Grade',
+                data: {{ top_parties|map(attribute='total')|list|tojson }},
+                backgroundColor: '#007bff'
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Search functionality
+    function searchVehicles() {
+        const formData = new FormData(document.getElementById('searchForm'));
+        const params = new URLSearchParams(formData);
+        window.location.href = `/vehicles?${params.toString()}`;
+    }
+
+    // Export functionality
+    function exportData() {
+        window.location.href = "{{ url_for('export_data') }}";
+    }
+</script>
+{% endblock %}

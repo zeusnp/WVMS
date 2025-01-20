@@ -1,0 +1,90 @@
+/* Custom styles for WVMS */
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,.05);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.btn {
+    border-radius: 4px;
+}
+
+.modal-content {
+    border-radius: 8px;
+    border: none;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* Dashboard cards */
+.card.bg-primary {
+    background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+}
+
+.card.bg-warning {
+    background: linear-gradient(45deg, #f6c23e 0%, #f4b619 100%);
+}
+
+.card.bg-success {
+    background: linear-gradient(45deg, #1cc88a 0%, #13855c 100%);
+}
+
+/* Responsive table */
+.table-responsive {
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+/* Form styling */
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Login page */
+.login-page {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    max-width: 400px;
+    width: 100%;
+}
+
+/* DataTables customization */
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #007bff;
+    color: white !important;
+    border: 1px solid #007bff;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #0056b3;
+    color: white !important;
+    border: 1px solid #0056b3;
+}
