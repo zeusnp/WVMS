@@ -1,74 +1,118 @@
-# Wood Vehicle Management System (WVMS)
+# Wood Carrying Vehicle Management System (WVMS)
 
-A web-based application for managing wood vehicles and their measurements.
+A professional, enterprise-grade web-based management system for wood transportation vehicles, measurement records, parties, and logistics operations.
 
-## Features
+## 🚀 Features
 
-- User authentication and authorization
-- Vehicle management
-- Measurement tracking
-- Data export to Excel
-- Dark/Light mode
-- Responsive design
+### Core Modules
+- ✅ **Authentication & RBAC**: Secure login with role-based access control
+- ✅ **Dashboard**: Real-time analytics and KPIs
+- ✅ **Vehicle Management**: Complete vehicle entry and tracking
+- ✅ **Measurement Module**: Advanced wood measurement handling
+- ✅ **Party Management**: Party and sub-party tracking
+- ✅ **Vehicle Tracking**: Real-time status monitoring
+- ✅ **Advanced Search**: Powerful filtering and search capabilities
+- ✅ **Reporting & Export**: Excel, PDF, CSV exports
+- ✅ **Audit Trail**: Complete activity logging
+- ✅ **Mobile Responsive**: Fully responsive design
+- ✅ **Dark Mode**: Theme customization
 
-## Local Development Setup
+## 📊 Tech Stack
 
-1. Clone the repository
+- **Frontend**: React 18+ with TypeScript
+- **Backend**: Node.js/Express with TypeScript
+- **Database**: PostgreSQL
+- **Authentication**: JWT with refresh tokens
+- **UI Framework**: Material-UI (MUI) v5+
+- **State Management**: Redux Toolkit
+- **Form Handling**: React Hook Form
+- **Charts**: Recharts
+- **Export**: ExcelJS, PDFKit
+
+## 📁 Project Structure
+
+```
+WVMS/
+├── frontend/                # React application
+├── backend/                 # Node.js/Express API
+├── shared/                  # Shared types and utilities
+├── docs/                    # Documentation
+├── docker-compose.yml       # Docker setup
+└── package.json             # Root package configuration
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- Docker & Docker Compose (optional)
+
+### Installation
+
 ```bash
-git clone <repository-url>
+# Clone repository
+git clone https://github.com/zeusnp/WVMS.git
 cd WVMS
+
+# Install dependencies
+cd backend && npm install
+cd ../frontend && npm install
+
+# Setup environment variables
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# Run migrations
+cd backend && npm run migrate
+
+# Start services
+npm run dev
 ```
 
-2. Create a virtual environment and activate it
+## 📖 Documentation
+
+See [docs/](./docs/) for detailed documentation including:
+- [Architecture](./docs/ARCHITECTURE.md)
+- [API Documentation](./docs/API.md)
+- [Database Schema](./docs/DATABASE_SCHEMA.md)
+- [Roles & Permissions](./docs/ROLES_PERMISSIONS.md)
+
+## 📝 User Roles
+
+1. **Super Admin** - Full system access
+2. **Admin** - Administrative operations
+3. **Operator** - Data entry and operational
+4. **Measurement Staff** - Measurement operations
+5. **Viewer/Accountant** - Read-only with reporting
+
+## 🔒 Security Features
+
+- JWT-based authentication
+- Password hashing with bcrypt
+- Role-based access control (RBAC)
+- Audit trail for all operations
+- Rate limiting on API endpoints
+- CORS protection
+- CSRF protection
+
+## 📦 Deployment
+
+### Docker
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Build and run with Docker Compose
+docker-compose up -d
 ```
 
-3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+## 📄 License
 
-4. Initialize the database
-```bash
-python init_db.py
-```
+MIT
 
-5. Run the development server
-```bash
-python app.py
-```
+## 👨‍💻 Contributors
 
-The application will be available at `http://localhost:5000`
+Created for professional wood transportation management.
 
-## Deployment to Render.com
+---
 
-1. Create a [Render.com](https://render.com) account
-
-2. Create a new Web Service:
-   - Connect your GitHub repository
-   - Select the Python environment
-   - Use the following settings:
-     - Build Command: `pip install -r requirements.txt`
-     - Start Command: `gunicorn app:app`
-
-3. Add the following environment variables:
-   - `FLASK_ENV`: production
-   - `SECRET_KEY`: (generate a secure random string)
-   - `DATABASE_URL`: (will be automatically added by Render)
-
-4. Deploy the application:
-   - Render will automatically deploy your application
-   - Any new commits to the main branch will trigger automatic deployments
-
-## Default Admin Account
-
-- Username: admin
-- Password: admin
-
-**Important**: Change the admin password after first login!
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Status**: 🔨 Development in Progress

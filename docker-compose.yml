@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: wvms_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-wood_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_123}
+      POSTGRES_DB: ${DB_NAME:-wood_vehicle_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - wvms_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wood_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: wvms_backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${DB_USER:-wood_admin}:${DB_PASSWORD:-secure_password_123}@postgres:5432/${DB_NAME:-wood_vehicle_db}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_EXPIRE: ${JWT_EXPIRE:-7d}
+      PORT: ${BACKEND_PORT:-3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-3001}:${BACKEND_PORT:-3001}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - wvms_network
+    volumes:
+      - ./backend:/app/backend
+      - /app/backend/node_modules
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: wvms_frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:${BACKEND_PORT:-3001}
+      REACT_APP_ENVIRONMENT: ${NODE_ENV:-production}
+    ports:
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    depends_on:
+      - backend
+    networks:
+      - wvms_network
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  wvms_network:
+    driver: bridge
